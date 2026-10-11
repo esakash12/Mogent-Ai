@@ -20,26 +20,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = React.useState<Theme>("light");
   const [mounted, setMounted] = React.useState(false);
 
-  React.useEffect(() => {
+    React.useEffect(() => {
     setMounted(true);
     try {
       const stored = localStorage.getItem("mogent_theme") as Theme | null;
-      if (stored === "dark" || stored === "light") {
-        setThemeState(stored);
-        if (stored === "dark") {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-        }
+      if (stored === "dark") {
+        setThemeState("dark");
+        document.documentElement.classList.add("dark");
       } else {
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const initial = prefersDark ? "dark" : "light";
-        setThemeState(initial);
-        if (prefersDark) {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-        }
+        setThemeState("light");
+        document.documentElement.classList.remove("dark");
       }
     } catch {
       // Ignore

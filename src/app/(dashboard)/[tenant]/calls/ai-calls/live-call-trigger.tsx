@@ -15,7 +15,7 @@ export function LiveCallTrigger({ tenantSlug, storeName }: LiveCallTriggerProps)
 
   return (
     <>
-      <div className="rounded-3xl border border-indigo-200/80 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-pink-500/10 p-6 shadow-sm dark:border-indigo-900/50 dark:bg-slate-900/80">
+      <div className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-pink-500/10 p-6 shadow-xs bg-white">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-600/30">
@@ -23,14 +23,14 @@ export function LiveCallTrigger({ tenantSlug, storeName }: LiveCallTriggerProps)
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                <h3 className="text-base font-bold text-slate-900">
                   প্লাগ-অ্যান্ড-প্লে ব্রাউজার এআই ভয়েস কল ডেমো
                 </h3>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-300">
                   <Radio className="w-2.5 h-2.5 animate-pulse" /> লাইভ রেডি
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 max-w-xl">
+              <p className="text-xs text-slate-600 mt-0.5 max-w-xl">
                 কোনো সিম বা টেলিকম ব্যালেন্স ছাড়াই ব্রাউজার মাইক্রোফোন দিয়ে সরাসরি এআই সেলস এজেন্টের সাথে কথা বলুন। এআই রিয়েল-টাইমে বাংলায় মুখে উত্তর দেবে!
               </p>
             </div>
