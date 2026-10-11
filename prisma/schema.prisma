@@ -1,0 +1,540 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Super Admin Master Platform Configuration
+model SuperAdminConfig {
+  id               String   @id @default(uuid())
+
+  // AI Brain & Models
+  openaiApiKey     String?
+  geminiApiKey     String?
+  anthropicApiKey  String?
+  defaultAiModel   String   @default("gemini-3.5-flash-lite")
+  perMessageCost   Float    @default(0.25) // Profit margin per message in BDT
+
+  // Voice & Telephony (Twilio & Local SIP / VoIP)
+  voiceProvider    String?  @default("TWILIO") // TWILIO, CUSTOM_SIP
+  twilioAccountSid String?
+  twilioAuthToken  String?
+  twilioPhoneNumber String?
+  sipServer        String?  // e.g. sip.amberit.com.bd
+  sipPort          Int?     @default(5060)
+  sipUsername      String?
+  sipPassword      String?
+  sipCallerId      String?
+  ttsProvider      String?  @default("ELEVENLABS") // ELEVENLABS, OPENAI, GOOGLE
+  ttsApiKey        String?
+  ttsVoiceId       String?
+  perMinuteCallCost Float   @default(2.50) // BDT charged to merchant wallet
+
+  // SMS Gateway (Greenweb, BulkSMSBD, SSL Wireless)
+  smsProvider      String?  @default("GREENWEB") // GREENWEB, BULKSMSBD, SSL_WIRELESS
+  greenwebToken    String?
+  bulksmsApiKey    String?
+  bulksmsSenderId  String?
+  sslczSmsApiKey   String?
+  sslczSmsSid      String?
+  perSmsCost       Float    @default(0.35) // BDT charged to merchant wallet
+
+  // Payment Gateway (Merchant Wallet Top-Up)
+  bkashAppKey      String?
+  bkashAppSecret   String?
+  bkashUsername    String?
+  bkashPassword    String?
+  bkashSandbox     Boolean  @default(true)
+  sslczStoreId     String?
+  sslczStorePassword String?
+  sslczSandbox     Boolean  @default(true)
+  aamarpayStoreId  String?
+  aamarpaySignatureKey String?
+  aamarpaySandbox  Boolean  @default(true)
+
+  // Cloud Storage (AWS S3 & Cloudflare R2)
+  storageProvider      String?  @default("LOCAL") // LOCAL, AWS_S3, CLOUDFLARE_R2
+  storageAccessKeyId   String?
+  storageSecretAccessKey String?
+  storageBucketName    String?
+  storageRegion        String?  @default("ap-southeast-1")
+  storageEndpoint      String?
+  storagePublicUrl     String?
+
+  // Google OAuth & Cloud Sheets
+  googleClientId       String?
+  googleClientSecret   String?
+  googleSheetsApiKey   String?
+  googleServiceAccountJson String?
+
+  // Meta & WhatsApp Embedded Signup
+  metaAppId            String?
+  metaAppSecret        String?
+  metaConfigId         String?  // WhatsApp Embedded Signup Configuration ID
+  whatsappSystemToken  String?  // Permanent System User Token
+  whatsappVerifyToken  String?  @default("mogent_ai_secure_verify_token_2026")
+
+  updatedAt        DateTime @updatedAt
+}
+
+
+// 2. Tenant (Store/Merchant)
+model Tenant {
+  id                 String              @id @default(uuid())
+  name               String
+  slug               String              @unique
+  contactPerson      String?
+  businessEmail      String?
+  phone              String?
+  businessType       String?             @default("E-commerce")
+  plan               String              @default("STANDARD") // FREE, STANDARD, ENTERPRISE
+  allowedDomains     String?             // Comma-separated domains for widget whitelist
+  steadfastApiKey    String?             // Courier API Key
+  steadfastSecretKey String?             // Courier Secret Key
+  pathaoClientId     String?             // Pathao Client ID
+  pathaoClientSecret String?             // Pathao Client Secret
+  metaPixelId        String?             // Meta Pixel ID
+  metaCapiToken      String?             // Meta Conversions API Access Token
+  metaTestEventCode  String?             // Meta CAPI Test Event Code
+  metaAdAccountId    String?             // Meta Ad Account ID (act_xxxx)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  users              User[]
+  wallet             Wallet?
+  ledgerEntries      LedgerEntry[]
+  channels           Channel[]
+  aiSetting          AiSetting?
+  products           Product[]
+  orders             Order[]
+  parcels            Parcel[]
+  conversations      Conversation[]
+  messages           Message[]
+  comments           Comment[]
+  callRecordings     CallRecording[]
+  broadcastCampaigns BroadcastCampaign[]
+  teamMembers        TeamMember[]
+  activityLogs       ActivityLog[]
+  notifications      Notification[]
+  savedReplies       SavedReply[]
+  adSpends           AdSpend[]
+  agentMemories      AgentMemoryEntry[]
+  tenantCredentials  TenantCredential[]
+  stockLocks         StockLock[]
+  appointmentSlots   AppointmentSlot[]
+  refundLedgers      RefundLedger[]
+}
+
+// 3. User & Authentication
+model User {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("OWNER") // SUPER_ADMIN, OWNER, MANAGER, AGENT
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// 4. Wallet & Balance (PAYG)
+model Wallet {
+  id          String        @id @default(uuid())
+  tenantId    String        @unique
+  balanceBdt  Float         @default(0.0)
+  updatedAt   DateTime      @updatedAt
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entries     LedgerEntry[]
+}
+
+// 5. Ledger (Audit trail for every top-up & AI message cost)
+model LedgerEntry {
+  id           String   @id @default(uuid())
+  walletId     String
+  tenantId     String
+  amount       Float    // Positive for top-up, negative for deduction
+  type         String   // TOPUP, AI_USAGE, SUBSCRIPTION_FEE
+  description  String
+  balanceAfter Float
+  createdAt    DateTime @default(now())
+
+  wallet       Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// 6. Omnichannel Channels (Facebook, Instagram, WhatsApp, Web, etc.)
+model Channel {
+  id              String         @id @default(uuid())
+  tenantId        String
+  type            String         // FACEBOOK, INSTAGRAM, WHATSAPP, WIDGET, SHOPIFY, WOOCOMMERCE
+  pageId          String?
+  pageName        String?
+  accessToken     String?        // AES encrypted long-lived token
+  tokenExpiresAt  DateTime?
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversations   Conversation[]
+}
+
+// 7. AI Settings & Behavior Rules
+model AiSetting {
+  id                         String   @id @default(uuid())
+  tenantId                   String   @unique
+  aiActive                   Boolean  @default(true)
+  reviewBeforeSending        Boolean  @default(false)
+  language                   String   @default("bn") // bn, en, banglish
+  greetingStyle              String   @default("ভাইয়া / আপু")
+  insideDhakaFee             Float    @default(60.0)
+  outsideDhakaFee            Float    @default(120.0)
+  bkashNumber                String?
+  returnPolicy               String?
+  orderConfirmationTemplate  String?
+  unknownPhotoAction         String   @default("ASK_NEVER_GUESS")
+  orderChangeAction          String   @default("HANDOFF_TO_TEAM")
+  orderFieldsJson            Json?    // Custom questions bot asks (size, color, etc.)
+  knowledgeBaseText          String?  @db.Text
+  enableCatalogCards         Boolean  @default(true)
+  catalogLocationUrl         String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  tenant                     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// 8. Product Catalog & Live Stock
+model Product {
+  id          String      @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  price       Float
+  stock       Int         @default(0)
+  category    String?     @default("General")
+  imageUrl    String?
+  source      String      @default("MANUAL") // MANUAL, FACEBOOK, SHOPIFY, WOOCOMMERCE
+  variants    Json?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
+  stockLocks  StockLock[]
+}
+
+// 9. Order Management
+model Order {
+  id                  String          @id @default(uuid())
+  tenantId            String
+  orderNumber         String          @unique
+  customerName        String
+  customerPhone       String
+  deliveryAddress     String
+  subtotal            Float
+  deliveryCharge      Float           @default(0.0)
+  totalAmount         Float
+  status              String          @default("PENDING") // PENDING, PROCESSING, COMPLETED, CANCELLED
+  channel             String          @default("FACEBOOK") // FACEBOOK, INSTAGRAM, WHATSAPP, WIDGET
+  remarks             String?
+  courierName         String?         // STEADFAST, PATHAO
+  courierTrackingCode String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  tenant              Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items               OrderItem[]
+  parcels             Parcel[]
+  callRecordings      CallRecording[]
+
+  @@index([tenantId, createdAt])
+}
+
+// 10. Order Items
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  productId   String?
+  productName String
+  quantity    Int      @default(1)
+  unitPrice   Float
+  totalPrice  Float
+
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+}
+
+// 11. Courier Parcels & Invoices (Steadfast / Pathao)
+model Parcel {
+  id             String   @id @default(uuid())
+  tenantId       String
+  orderId        String
+  consignmentId  String?
+  courierName    String   // STEADFAST, PATHAO
+  trackingCode   String?
+  status         String   @default("PENDING") // PENDING, IN_TRANSIT, DELIVERED, RETURNED
+  deliveryFee    Float    @default(0.0)
+  codAmount      Float    @default(0.0)
+  invoiceUrl     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// 12. Omnichannel Conversations
+model Conversation {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  channelId          String?
+  customerExternalId String?
+  customerName       String
+  customerPhone      String?
+  channelType        String    @default("FACEBOOK") // FACEBOOK, INSTAGRAM, WHATSAPP, WIDGET
+  status             String    @default("ACTIVE") // ACTIVE, CLOSED, UNREPLIED, TICKET, NEEDS_ATTENTION
+  assignedToId       String?
+  aiHandled          Boolean   @default(true)
+  tags               String?
+  takeoverReason     String?
+  scratchpad         Json?     // Dynamic Agent working memory for this conversation
+  lastMessageAt      DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel            Channel?  @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  messages           Message[]
+
+  @@index([tenantId, lastMessageAt])
+}
+
+// 13. Messages (with Token & AI Cost Tracking)
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  tenantId       String
+  externalId     String?      // e.g. Meta mid
+  senderType     String       // CUSTOMER, AI, AGENT
+  senderName     String
+  content        String       @db.Text
+  mediaUrl       String?
+  aiCostBdt      Float        @default(0.0)
+  verifiedStock  Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([externalId])
+}
+
+// 14. Facebook Post Comments Automation
+model Comment {
+  id            String   @id @default(uuid())
+  tenantId      String
+  postId        String
+  commentId     String   @unique
+  commenterName String
+  commentText   String
+  aiReplyText   String?
+  dmSent        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// 15. AI Automated Voice Calls & Recordings
+model CallRecording {
+  id             String   @id @default(uuid())
+  tenantId       String
+  orderId        String?
+  customerPhone  String
+  callDurationSec Int     @default(0)
+  recordingUrl   String?
+  callStatus     String   @default("COMPLETED") // COMPLETED, NO_ANSWER, FAILED
+  summary        String?
+  createdAt      DateTime @default(now())
+
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order          Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+}
+
+// 16. Broadcast Campaigns (WhatsApp / Messenger Bulk)
+model BroadcastCampaign {
+  id             String   @id @default(uuid())
+  tenantId       String
+  name           String
+  channel        String   @default("WHATSAPP") // WHATSAPP, MESSENGER
+  messageText    String   @db.Text
+  recipientCount Int      @default(0)
+  sentCount      Int      @default(0)
+  status         String   @default("DRAFT") // DRAFT, SCHEDULED, SENT
+  createdAt      DateTime @default(now())
+
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// 17. Team Members & Multi-Agent Roles
+model TeamMember {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  email     String
+  role      String   @default("AGENT") // MANAGER, AGENT
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// 18. Activity & Audit Logs
+model ActivityLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String?
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// 19. In-App Notifications
+model Notification {
+  id        String   @id @default(uuid())
+  tenantId  String
+  title     String
+  message   String
+  type      String   @default("SYSTEM") // ORDER, BALANCE_ALERT, TICKET, SYSTEM
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// 20. Saved Quick Replies (Canned Responses)
+model SavedReply {
+  id        String   @id @default(uuid())
+  tenantId  String
+  title     String
+  content   String   @db.Text
+  category  String?  @default("General")
+  createdAt DateTime @default(now())
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// 21. Meta Ad Spend & ROI Tracking
+model AdSpend {
+  id           String   @id @default(uuid())
+  tenantId     String
+  amount       Float
+  date         DateTime @default(now())
+  campaignName String?
+  platform     String   @default("FACEBOOK") // FACEBOOK, INSTAGRAM, GOOGLE
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// 22. AI Agent Dynamic Living Notebook (Unstructured Knowledge & Rules)
+model AgentMemoryEntry {
+  id        String   @id @default(uuid())
+  tenantId  String
+  category  String   @default("CUSTOM_RULE") // POLICY, PRODUCT_INFO, PAYMENT, DISCOUNT_OFFER, STORE_INFO, CUSTOM_RULE
+  title     String
+  content   String   @db.Text
+  tags      String[] @default([])
+  source    String   @default("CHAT_TRAINING") // CHAT_TRAINING, MANUAL_DASHBOARD, URL_IMPORT
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, category])
+  @@index([tenantId, isActive])
+}
+
+// 23. Tenant Encrypted Credentials Vault (AES-256)
+model TenantCredential {
+  id               String   @id @default(uuid())
+  tenantId         String
+  channel          String   // meta, whatsapp, steadfast, pathao, bkash, telegram
+  encryptedPayload Json
+  isValid          Boolean  @default(true)
+  updatedAt        DateTime @updatedAt
+
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, channel])
+  @@index([tenantId])
+}
+
+// 24. Context-Aware Stock Locks (Night DND, 50% Cap, Instant Payer Pre-emption)
+model StockLock {
+  id            String   @id @default(uuid())
+  tenantId      String
+  productId     String
+  customerPhone String
+  quantity      Int      @default(1)
+  lockType      String   // cod_day, cod_night_dnd, pgw_pending
+  expiresAt     DateTime
+  isReleased    Boolean  @default(false)
+  preemptedBy   String?  // References instant prepaid order ID
+  createdAt     DateTime @default(now())
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, productId])
+  @@index([expiresAt, isReleased])
+  @@index([customerPhone])
+}
+
+// 25. Atomic Clinic / Salon Appointment Slots (5-Min Concurrency Mutex)
+model AppointmentSlot {
+  id            String    @id @default(uuid())
+  tenantId      String
+  providerName  String    // e.g. Dr. Rahman, Stylist Priya
+  startTime     DateTime
+  endTime       DateTime
+  isBooked      Boolean   @default(false)
+  lockedUntil   DateTime? // 5-minute mutex
+  customerPhone String?
+  createdAt     DateTime  @default(now())
+
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, providerName, startTime])
+  @@index([tenantId, startTime])
+}
+
+// 26. Abandoned Partial Advance & Refund Ledger (Formula & Sweeper)
+model RefundLedger {
+  id            String    @id @default(uuid())
+  tenantId      String
+  customerPhone String
+  amount        Float
+  sourceTrxId   String?
+  status        String    @default("unclaimed") // unclaimed, flexiload_dispatched, voucher_issued, refunded
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, customerPhone])
+  @@index([status])
+}
